@@ -1,5 +1,6 @@
 package com.nirwashh.android.randomcatpicturewithcoroutine
 
+import kotlinx.coroutines.suspendCancellableCoroutine
 import retrofit2.Call
 import retrofit2.Callback
 import retrofit2.Response
@@ -15,18 +16,19 @@ interface CatService {
     fun getCat(): Call<CatResponse>
 }
 
-suspend fun <T> Call<T>.await() = suspendCoroutine<T> {
+suspend fun <T : Result<*>> Call<T>.await() = suspendCancellableCoroutine<T> { continuation ->
+    continuation.invokeOnCancellation { cancel() }
     enqueue(object : Callback<T> {
         override fun onResponse(call: Call<T>, response: Response<T>) {
             if (response.isSuccessful) {
-                it.resume(response.body()!!)
+                continuation.resumeWith(Result.success(response.body()!!))
             } else {
-                it.resumeWithException(IllegalStateException("wrong"))
+                continuation.resumeWith(Result.failure(IllegalStateException("wrong")))
             }
         }
 
         override fun onFailure(call: Call<T>, t: Throwable) {
-            it.resumeWithException(t)
+            continuation.resumeWith(Result.failure(t))
         }
     })
 }
